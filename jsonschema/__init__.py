@@ -23,6 +23,7 @@ from jsonschema._types import TypeChecker
 from jsonschema.validators import (
     Draft3Validator,
     Draft4Validator,
+    ExtendedDraft4Validator,
     Draft6Validator,
     Draft7Validator,
     RefResolver,

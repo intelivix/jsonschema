@@ -584,6 +584,12 @@ Draft7Validator = create(
 _LATEST_VERSION = Draft7Validator
 
 
+ExtendedDraft4Validator = extend(
+    validator=Draft4Validator,
+    validators={},
+)
+
+
 class RefResolver(object):
     """
     Resolve JSON References.
