@@ -586,7 +586,9 @@ _LATEST_VERSION = Draft7Validator
 
 ExtendedDraft4Validator = extend(
     validator=Draft4Validator,
-    validators={},
+    validators={
+        u"required": _validators.required_with_list,
+    },
 )
 
 

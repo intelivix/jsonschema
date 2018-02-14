@@ -359,3 +359,15 @@ def if_(validator, if_schema, instance, schema):
         else_ = schema[u"else"]
         for error in validator.descend(instance, else_, schema_path="else"):
             yield error
+
+
+def required_with_list(validator, required, instance, schema):
+    if not validator.is_type(instance, "object"):
+        return
+    for property in required:
+        if isinstance(property, list):
+            if not any([instance.get(x, False) for x in property]):
+                yield ValidationError("At least one of %r are "
+                                      "required" % property)
+        elif property not in instance:
+            yield ValidationError("%r is a required property" % property)
