@@ -1,3 +1,14 @@
+***************************************
+THIS IS A FORK, USE IT AT YOUR OWN RISK
+***************************************
+
+.. image:: https://img.shields.io/pypi/v/jsonschema.svg
+    :target: https://pypi.python.org/pypi/jsonschema
+.. image:: https://travis-ci.org/Julian/jsonschema.svg?branch=master
+    :target: https://travis-ci.org/Julian/jsonschema
+.. image:: https://img.shields.io/pypi/l/jsonschema.svg
+    :target: https://pypi.python.org/pypi/jsonschema
+
 ==========
 jsonschema
 ==========
