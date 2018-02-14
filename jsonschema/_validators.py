@@ -371,3 +371,24 @@ def required_with_list(validator, required, instance, schema):
                                       "required" % property)
         elif property not in instance:
             yield ValidationError("%r is a required property" % property)
+
+
+def properties_with_default(validator, properties, instance, schema):
+    if not validator.is_type(instance, "object"):
+        return
+
+    for property, subschema in iteritems(properties):
+        if property in instance:
+            for error in validator.descend(
+                instance[property],
+                subschema,
+                path=property,
+                schema_path=property,
+            ):
+                yield error
+
+    # Default is assigned after properties validation so that type errors
+    # aren't reported if the default type doesn't match it's property type
+    for property, subschema in properties.iteritems():
+        if "default" in subschema:
+            instance.setdefault(property, subschema["default"])
