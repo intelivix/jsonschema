@@ -47,7 +47,7 @@ def additionalProperties(validator, aP, instance, schema):
                 verb = "does"
             else:
                 verb = "do"
-            error = "%s %s not match any of the regexes: %s" % (
+            error = "{!s} {!s} not match any of the regexes: {!s}".format(
                 ", ".join(map(repr, sorted(extras))),
                 verb,
                 ", ".join(map(repr, patterns)),
@@ -127,9 +127,7 @@ def exclusiveMaximum(validator, maximum, instance, schema):
 
     if instance >= maximum:
         yield ValidationError(
-            "%r is greater than or equal to the maximum of %r" % (
-                instance, maximum,
-            ),
+            "{!r} is {!s} the minimum of {!r}".format(instance, cmp, minimum)
         )
 
 
@@ -149,7 +147,7 @@ def maximum(validator, maximum, instance, schema):
 
     if instance > maximum:
         yield ValidationError(
-            "%r is greater than the maximum of %r" % (instance, maximum)
+            "{!r} is {!s} the maximum of {!r}".format(instance, cmp, maximum)
         )
 
 
@@ -164,17 +162,17 @@ def multipleOf(validator, dB, instance, schema):
         failed = instance % dB
 
     if failed:
-        yield ValidationError("%r is not a multiple of %r" % (instance, dB))
+        yield ValidationError("{!r} is not a multiple of {!r}".format(instance, dB))
 
 
 def minItems(validator, mI, instance, schema):
     if validator.is_type(instance, "array") and len(instance) < mI:
-        yield ValidationError("%r is too short" % (instance,))
+        yield ValidationError("{!r} is too short".format(instance))
 
 
 def maxItems(validator, mI, instance, schema):
     if validator.is_type(instance, "array") and len(instance) > mI:
-        yield ValidationError("%r is too long" % (instance,))
+        yield ValidationError("{!r} is too long".format(instance))
 
 
 def uniqueItems(validator, uI, instance, schema):
@@ -183,7 +181,7 @@ def uniqueItems(validator, uI, instance, schema):
         validator.is_type(instance, "array") and
         not _utils.uniq(instance)
     ):
-        yield ValidationError("%r has non-unique elements" % (instance,))
+        yield ValidationError("{!r} has non-unique elements".format(instance))
 
 
 def pattern(validator, patrn, instance, schema):
@@ -191,7 +189,7 @@ def pattern(validator, patrn, instance, schema):
         validator.is_type(instance, "string") and
         not re.search(patrn, instance)
     ):
-        yield ValidationError("%r does not match %r" % (instance, patrn))
+        yield ValidationError("{!r} does not match {!r}".format(instance, patrn))
 
 
 def format(validator, format, instance, schema):
@@ -204,19 +202,19 @@ def format(validator, format, instance, schema):
 
 def minLength(validator, mL, instance, schema):
     if validator.is_type(instance, "string") and len(instance) < mL:
-        yield ValidationError("%r is too short" % (instance,))
+        yield ValidationError("{!r} is too short".format(instance))
 
 
 def maxLength(validator, mL, instance, schema):
     if validator.is_type(instance, "string") and len(instance) > mL:
-        yield ValidationError("%r is too long" % (instance,))
+        yield ValidationError("{!r} is too long".format(instance))
 
 
 def dependencies(validator, dependencies, instance, schema):
     if not validator.is_type(instance, "object"):
         return
 
-    for property, dependency in iteritems(dependencies):
+    for E, dependency in iteritems(dependencies):
         if property not in instance:
             continue
 
@@ -232,9 +230,10 @@ def dependencies(validator, dependencies, instance, schema):
                 yield error
 
 
+
 def enum(validator, enums, instance, schema):
     if instance not in enums:
-        yield ValidationError("%r is not one of %r" % (instance, enums))
+        yield ValidationError("{!r} is not one of {!r}".format(instance, enums))
 
 
 def ref(validator, ref, instance, schema):
@@ -261,17 +260,89 @@ def type(validator, types, instance, schema):
         yield ValidationError(_utils.types_msg(instance, types))
 
 
+def type_draft3(validator, types, instance, schema):
+    types = _utils.ensure_list(types)
+
+    all_errors = []
+    for index, type in enumerate(types):
+        if type == "any":
+            return
+        if validator.is_type(type, "object"):
+            errors = list(validator.descend(instance, type, schema_path=index))
+            if not errors:
+                return
+            all_errors.extend(errors)
+        else:
+            if validator.is_type(instance, type):
+                return
+    else:
+        yield ValidationError(
+            _utils.types_msg(instance, types), context=all_errors,
+        )
+
+
+def properties_draft3(validator, properties, instance, schema):
+    if not validator.is_type(instance, "object"):
+        return
+
+    for prop, subschema in iteritems(properties):
+        if prop in instance:
+            for error in validator.descend(
+                instance[prop],
+                subschema,
+                path=prop,
+                schema_path=prop,
+            ):
+                yield error
+        elif subschema.get("required", False):
+            error = ValidationError("{!r} is a required property".format(prop))
+            error._set(
+                validator="required",
+                validator_value=subschema["required"],
+                instance=instance,
+                schema=schema,
+            )
+            error.path.appendleft(prop)
+            error.schema_path.extend([prop, "required"])
+            yield error
+
+
+def disallow_draft3(validator, disallow, instance, schema):
+    for disallowed in _utils.ensure_list(disallow):
+        if validator.is_valid(instance, {"type": [disallowed]}):
+            yield ValidationError(
+                "{!r} is disallowed for {!r}".format(disallowed, instance)
+            )
+
+
+def extends_draft3(validator, extends, instance, schema):
+    if validator.is_type(extends, "object"):
+        for error in validator.descend(instance, extends):
+            yield error
+        return
+    for index, subschema in enumerate(extends):
+        for error in validator.descend(instance, subschema, schema_path=index):
+            yield error
+
+
+def type_draft4(validator, types, instance, schema):
+    types = _utils.ensure_list(types)
+
+    if not any(validator.is_type(instance, type) for type in types):
+        yield ValidationError(_utils.types_msg(instance, types))
+
+
 def properties(validator, properties, instance, schema):
     if not validator.is_type(instance, "object"):
         return
 
-    for property, subschema in iteritems(properties):
-        if property in instance:
+    for prop, subschema in iteritems(properties):
+        if prop in instance:
             for error in validator.descend(
-                instance[property],
+                instance[prop],
                 subschema,
-                path=property,
-                schema_path=property,
+                path=prop,
+                schema_path=prop,
             ):
                 yield error
 
@@ -279,15 +350,15 @@ def properties(validator, properties, instance, schema):
 def required(validator, required, instance, schema):
     if not validator.is_type(instance, "object"):
         return
-    for property in required:
-        if property not in instance:
-            yield ValidationError("%r is a required property" % property)
+    for prop in required:
+        if prop not in instance:
+            yield ValidationError("{!r} is a required property".format(prop))
 
 
 def minProperties(validator, mP, instance, schema):
     if validator.is_type(instance, "object") and len(instance) < mP:
         yield ValidationError(
-            "%r does not have enough properties" % (instance,)
+            "{!r} does not have enough properties".format(instance)
         )
 
 
@@ -295,7 +366,7 @@ def maxProperties(validator, mP, instance, schema):
     if not validator.is_type(instance, "object"):
         return
     if validator.is_type(instance, "object") and len(instance) > mP:
-        yield ValidationError("%r has too many properties" % (instance,))
+        yield ValidationError("{!r} has too many properties".format(instance))
 
 
 def allOf(validator, allOf, instance, schema):
@@ -313,8 +384,16 @@ def anyOf(validator, anyOf, instance, schema):
         all_errors.extend(errs)
     else:
         yield ValidationError(
-            "%r is not valid under any of the given schemas" % (instance,),
+            "{!r} is not valid under any of the given schemas".format(instance),
             context=all_errors,
+        )
+
+    more_valid = [s for i, s in subschemas if validator.is_valid(instance, s)]
+    if more_valid:
+        more_valid.append(first_valid)
+        reprs = ", ".join(repr(schema) for schema in more_valid)
+        yield ValidationError(
+            "{!r} is valid under each of {!s}".format(instance, reprs)
         )
 
 
@@ -329,7 +408,7 @@ def oneOf(validator, oneOf, instance, schema):
         all_errors.extend(errs)
     else:
         yield ValidationError(
-            "%r is not valid under any of the given schemas" % (instance,),
+            "{!r} is not valid under any of the given schemas".format(instance),
             context=all_errors,
         )
 
@@ -345,7 +424,7 @@ def oneOf(validator, oneOf, instance, schema):
 def not_(validator, not_schema, instance, schema):
     if validator.is_valid(instance, not_schema):
         yield ValidationError(
-            "%r is not allowed for %r" % (not_schema, instance)
+            "{!r} is not allowed for {!r}".format(not_schema, instance)
         )
 
 
@@ -364,31 +443,31 @@ def if_(validator, if_schema, instance, schema):
 def required_with_list(validator, required, instance, schema):
     if not validator.is_type(instance, "object"):
         return
-    for property in required:
-        if isinstance(property, list):
-            if not any([instance.get(x, False) for x in property]):
-                yield ValidationError("At least one of %r are "
-                                      "required" % property)
-        elif property not in instance:
-            yield ValidationError("%r is a required property" % property)
+    for prop in required:
+        if isinstance(prop, list):
+            if not any([instance.get(x, False) for x in prop]):
+                yield ValidationError("At least one of {!r} are "
+                                      "required".format(prop))
+        elif prop not in instance:
+            yield ValidationError("{!r} is a required property".format(prop))
 
 
 def properties_with_default(validator, properties, instance, schema):
     if not validator.is_type(instance, "object"):
         return
 
-    for property, subschema in iteritems(properties):
-        if property in instance:
+    for prop, subschema in iteritems(properties):
+        if prop in instance:
             for error in validator.descend(
-                instance[property],
+                instance[prop],
                 subschema,
-                path=property,
-                schema_path=property,
+                path=prop,
+                schema_path=prop,
             ):
                 yield error
 
     # Default is assigned after properties validation so that type errors
     # aren't reported if the default type doesn't match it's property type
-    for property, subschema in properties.iteritems():
+    for prop, subschema in properties.iteritems():
         if "default" in subschema:
-            instance.setdefault(property, subschema["default"])
+            instance.setdefault(prop, subschema["default"])

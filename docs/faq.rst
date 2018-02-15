@@ -32,9 +32,9 @@ themselves will need to be valid under the schema.)
             validate_properties = validator_class.VALIDATORS["properties"]
 
             def set_defaults(validator, properties, instance, schema):
-                for property, subschema in properties.iteritems():
+                for prop, subschema in properties.iteritems():
                     if "default" in subschema:
-                        instance.setdefault(property, subschema["default"])
+                        instance.setdefault(prop, subschema["default"])
 
                 for error in validate_properties(
                     validator, properties, instance, schema,
